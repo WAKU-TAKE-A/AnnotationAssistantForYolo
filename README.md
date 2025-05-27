@@ -1,0 +1,2 @@
+# AnnotationAssistantForYolo
+YOLO形式のアノテーションを効率的に行うためのGUIツール
