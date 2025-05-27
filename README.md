@@ -62,6 +62,8 @@ GUIが立ち上がります。
 
 ### 3. 各操作
 
+![画面の説明](https://raw.githubusercontent.com/WAKU-TAKE-A/AnnotationAssistantForYolo/refs/heads/main/screenshot01.jpg)
+
 | ボタン名                  | 説明                                                          |
 |---------------------------|---------------------------------------------------------------|
 | プロジェクトフォルダの選択 | YOLO形式のプロジェクトフォルダを選択しフォルダ構造を検証          |
