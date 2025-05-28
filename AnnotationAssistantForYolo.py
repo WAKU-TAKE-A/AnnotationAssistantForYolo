@@ -39,7 +39,7 @@ class AnnotationFileMoverApp:
 
         self.btn_predict = tb.Button(
             button_frame,
-            text="アノテーション前の推論処理",
+            text="プリラベリング",
             bootstyle="secondary",
             command=self.predict_yolo,
             state="disabled"
@@ -97,7 +97,7 @@ class AnnotationFileMoverApp:
 
         self.btn_train = tb.Button(
             button_frame,
-            text="追加学習",
+            text="ファインチューニング",
             bootstyle="success",
             command=self.run_train_script,
             state="disabled"
