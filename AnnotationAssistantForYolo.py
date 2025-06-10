@@ -11,7 +11,7 @@ import threading
 from ultralytics import YOLO
 from EasyCapture import EasyCapture
 
-# ここでPython実行コマンドを指定してください
+# 設定
 PYTHON_CMD = "C:/WinPython3.10dot/python-3.10.11.amd64/python.exe"
 CAPTURE_SOURCE = 0
 CAPTURE_WIDTH = 1920
@@ -114,6 +114,15 @@ class AnnotationFileMoverApp:
         self.entry_ratio = tb.Entry(button_frame, textvariable=self.ratio_text_var)
         self.entry_ratio.pack(side="top", fill='x', pady=5)
 
+        self.btn_move_all_to_all = tb.Button(
+            button_frame,
+            text="全データをallへ移動",
+            bootstyle="warning",
+            command=self.move_all_to_all_folder,
+            state="disabled"
+        )
+        self.btn_move_all_to_all.pack(side="top", fill='x', pady=5)
+
         self.btn_train = tb.Button(
             button_frame,
             text="ファインチューニング",
@@ -153,7 +162,7 @@ class AnnotationFileMoverApp:
         try:
             source = int(source_text)
         except ValueError:
-            source = source_text  # 文字列ならそのまま（ファイル名やURL）
+            source = source_text
 
         # EasyCaptureが起動中なら終了する
         if self.easy_capture is not None:
@@ -179,13 +188,13 @@ class AnnotationFileMoverApp:
             return
 
     def select_folder(self):
-        folder = filedialog.askdirectory(title="メインフォルダを選択してください")
+        folder = filedialog.askdirectory(title="プロジェクトフォルダを選択してください")
         if not folder:
             return
 
         self.clear_message()
         self.selected_folder = folder
-        self.log_message(f"選択フォルダ: {folder}")
+        self.log_message(f"プロジェクトフォルダ: {folder}")
 
         error_messages = []
 
@@ -200,19 +209,19 @@ class AnnotationFileMoverApp:
             if not os.path.isdir(lbl_path):
                 error_messages.append(f"フォルダが存在しません: labels/{d}")
 
-        # classes.txtは選択フォルダ直下にあるか調べる
+        # classes.txtはプロジェクトフォルダ直下にあるか調べる
         classes_txt_path = os.path.join(folder, "classes.txt")
         if not os.path.isfile(classes_txt_path):
-            error_messages.append(f"選択フォルダ直下に classes.txt がありません。")
+            error_messages.append(f"プロジェクトフォルダ直下に classes.txt がありません。")
 
         # train.pyとdata.yamlも確認（なくても警告程度）
         train_py_path = os.path.join(folder, "train.py")
         if not os.path.isfile(train_py_path):
-            self.log_message("警告: 選択フォルダ直下に train.py が見つかりません。")
+            self.log_message("警告: プロジェクトフォルダ直下に train.py が見つかりません。")
 
         data_yaml_path = os.path.join(folder, "data.yaml")
         if not os.path.isfile(data_yaml_path):
-            self.log_message("警告: 選択フォルダ直下に data.yaml が見つかりません。")
+            self.log_message("警告: プロジェクトフォルダ直下に data.yaml が見つかりません。")
 
         if error_messages:
             self.log_message("エラー：以下の項目を確認してください。")
@@ -225,6 +234,7 @@ class AnnotationFileMoverApp:
             self.btn_train.configure(state="disabled")
             self.btn_labelimg.configure(state="disabled")
             self.btn_all_distribute.configure(state="disabled")
+            self.btn_move_all_to_all.configure(state="disabled")
             self.btn_predict.configure(state="disabled")
             return
         else:
@@ -236,12 +246,13 @@ class AnnotationFileMoverApp:
             self.btn_train.configure(state="normal")
             self.btn_labelimg.configure(state="normal")
             self.btn_all_distribute.configure(state="normal")
+            self.btn_move_all_to_all.configure(state="normal")
             self.btn_predict.configure(state="normal")
 
     def pre_annotation_move(self):
         self.clear_message()
         if not self.selected_folder:
-            self.log_message("フォルダが選択されていません。")
+            self.log_message("プロジェクトフォルダが選択されていません。")
             return
 
         self.log_message("アノテーション前のファイル移動を開始します。")
@@ -269,7 +280,7 @@ class AnnotationFileMoverApp:
 
             self.log_message(f"{d}：labels から images へ {moved_count} ファイルを移動しました。")
 
-            # classes.txt を imagesにコピー（選択フォルダ直下からコピー）
+            # classes.txt を imagesにコピー（プロジェクトフォルダ直下からコピー）
             src_classes = os.path.join(self.selected_folder, "classes.txt")
             dst_classes = os.path.join(images_path, "classes.txt")
             if os.path.isfile(src_classes):
@@ -286,7 +297,7 @@ class AnnotationFileMoverApp:
     def post_annotation_move(self):
         self.clear_message()
         if not self.selected_folder:
-            self.log_message("フォルダが選択されていません。")
+            self.log_message("プロジェクトフォルダが選択されていません。")
             return
 
         self.log_message("アノテーション後のファイル移動を開始します。")
@@ -328,7 +339,7 @@ class AnnotationFileMoverApp:
     def change_label_ids(self):
         self.clear_message()
         if not self.selected_folder:
-            self.log_message("フォルダが選択されていません。")
+            self.log_message("プロジェクトフォルダが選択されていません。")
             return
 
         self.log_message("変更するラベルIDのCSVファイルを選択してください。")
@@ -419,14 +430,13 @@ class AnnotationFileMoverApp:
 
         self.log_message(f"処理が完了しました。合計 {total_files} ファイル処理、変更行数 {total_lines_changed} 行。")
 
-    # ⑤ allから振り分け処理（画像ファイルをランダムシャッフルし、指定比率でtrain/valid/testにコピー）
+    # allから振り分け処理（画像ファイルをランダムシャッフルし、指定比率でtrain/valid/testにコピー）
     def distribute_all_files(self):
         self.clear_message()
         if not self.selected_folder:
-            self.log_message("フォルダが選択されていません。")
+            self.log_message("プロジェクトフォルダが選択されていません。")
             return
 
-        # 比率テキスト取得
         ratio_str = self.ratio_text_var.get().strip()
         try:
             parts = ratio_str.split(":")
@@ -449,7 +459,6 @@ class AnnotationFileMoverApp:
             self.log_message("allフォルダ内に images または labels フォルダが存在しません。振り分け処理を中止します。")
             return
 
-        # all/imagesの画像ファイル判定（例として一般的な拡張子）
         img_exts = {".jpg", ".jpeg", ".png", ".bmp", ".gif"}
 
         all_image_files = [f for f in os.listdir(images_all)
@@ -492,11 +501,11 @@ class AnnotationFileMoverApp:
                 if not os.path.isdir(p):
                     os.makedirs(p)
 
-        def copy_file(src, dst):
+        def move_file(src, dst):
             try:
-                shutil.copy2(src, dst)
+                shutil.move(src, dst)
             except Exception as e:
-                self.log_message(f"コピー失敗: {src} -> {dst} : {e}")
+                self.log_message(f"移動失敗: {src} -> {dst} : {e}")
 
         # 振り分け実行
         idx = 0
@@ -518,25 +527,61 @@ class AnnotationFileMoverApp:
                 src_txt_path = os.path.join(labels_all, possible_txt)
                 dst_txt_path = os.path.join(target_paths[key]["labels"], possible_txt)
 
-                copy_file(src_img_path, dst_img_path)
+                move_file(src_img_path, dst_img_path)
                 if os.path.isfile(src_txt_path):
-                    copy_file(src_txt_path, dst_txt_path)
+                    move_file(src_txt_path, dst_txt_path)
                 else:
                     self.log_message(f"対応するテキストファイルが見つかりません: {possible_txt} （画像: {img_file}）")
 
         self.log_message("all から train/valid/test への振り分け処理が完了しました。")
+
+    # train/valid/testのimages/labelsをallへ移動
+    def move_all_to_all_folder(self):
+        self.clear_message()
+        if not self.selected_folder:
+            self.log_message("プロジェクトフォルダが選択されていません。")
+            return
+
+        self.log_message("train/valid/testのデータをallフォルダへ移動開始します。")
+
+        subsets = ['train', 'valid', 'test']
+        for subset in subsets:
+            for data_type in ['images', 'labels']:
+                src_dir = os.path.join(self.selected_folder, data_type, subset)
+                dst_dir = os.path.join(self.selected_folder, data_type, 'all')
+
+                if not os.path.isdir(src_dir):
+                    self.log_message(f"{subset}の{data_type}フォルダが見つかりません。スキップします。")
+                    continue
+                if not os.path.isdir(dst_dir):
+                    os.makedirs(dst_dir)
+
+                files = os.listdir(src_dir)
+                moved_count = 0
+                for f in files:
+                    src_file = os.path.join(src_dir, f)
+                    dst_file = os.path.join(dst_dir, f)
+                    try:
+                        shutil.move(src_file, dst_file)
+                        moved_count += 1
+                    except Exception as e:
+                        self.log_message(f"{subset}/{data_type}のファイル {f} の移動に失敗: {e}")
+
+                self.log_message(f"{subset}/{data_type}のファイルをallへ {moved_count} 件移動しました。")
+
+        self.log_message("全ての移動が完了しました。")
 
     def run_train_script(self):
         # ここを別スレッドで実行してUIの応答性を保つ
         def worker():
             self.clear_message()
             if not self.selected_folder:
-                self.log_message("フォルダが選択されていません。")
+                self.log_message("プロジェクトフォルダが選択されていません。")
                 return
 
             train_py_path = os.path.join(self.selected_folder, "train.py")
             if not os.path.isfile(train_py_path):
-                self.log_message("train.py が選択フォルダ直下に見つかりません。")
+                self.log_message("train.py がプロジェクトフォルダ直下に見つかりません。")
                 return
 
             self.log_message("train.py の実行を開始します。")
@@ -581,7 +626,7 @@ class AnnotationFileMoverApp:
 
         classes_txt_path = os.path.join(self.selected_folder, "classes.txt")
         if not os.path.isfile(classes_txt_path):
-            self.log_message("classes.txt が選択フォルダにありません。labelImgを起動しますが、ラベル読み込みに失敗する可能性があります。")
+            self.log_message("classes.txt がプロジェクトフォルダにありません。labelImgを起動しますが、ラベル読み込みに失敗する可能性があります。")
 
         self.log_message("labelImg.exe を起動します。")
 
@@ -601,7 +646,7 @@ class AnnotationFileMoverApp:
         def worker():
             self.clear_message()
             if not self.selected_folder:
-                self.log_message("フォルダが選択されていません。")
+                self.log_message("プロジェクトフォルダが選択されていません。")
                 return
 
             # ptファイル選択
