@@ -1,4 +1,6 @@
 import os
+os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
+
 import shutil
 import subprocess
 import tkinter as tk
@@ -6,17 +8,21 @@ from tkinter import filedialog
 import random
 import ttkbootstrap as tb
 import threading
-
 from ultralytics import YOLO
+from EasyCapture import EasyCapture
 
 # ここでPython実行コマンドを指定してください
 PYTHON_CMD = "C:/WinPython3.10dot/python-3.10.11.amd64/python.exe"
+CAPTURE_SOURCE = 0
+CAPTURE_WIDTH = 1920
+CAPTURE_HEIGHT = 1080
+CAPTURE_INTERVAL = 0.2
 
 class AnnotationFileMoverApp:
     def __init__(self, root):
         self.root = root
         self.root.title("AnnotationPrePostHelper")
-        self.root.geometry("600x400")
+        self.root.geometry("600x500")
 
         # ttkbootstrapスタイル指定
         self.style = tb.Style(theme="flatly")
@@ -36,6 +42,19 @@ class AnnotationFileMoverApp:
             command=self.select_folder
         )
         self.btn_select_folder.pack(side="top", fill='x', pady=5)
+
+        self.source_var = tk.StringVar(value=CAPTURE_SOURCE)
+        self.entry_source = tb.Entry(button_frame, textvariable=self.source_var)
+        self.entry_source.pack(side="top", fill='x', pady=5)
+
+        self.btn_capture = tb.Button(
+            button_frame,
+            text="画像の生成",
+            bootstyle="secondary",
+            command=self.run_easycapture,
+            state="disabled"
+        )
+        self.btn_capture.pack(side="top", fill='x', pady=5)
 
         self.btn_predict = tb.Button(
             button_frame,
@@ -108,6 +127,8 @@ class AnnotationFileMoverApp:
         self.message_text = tk.Text(root, height=20, state="disabled")
         self.message_text.pack(fill="both", expand=True, padx=10, pady=10, side="left")
 
+        self.easy_capture = None
+
     def log_message(self, message):
         # UIスレッドで実行するように呼び出しを調整
         def append():
@@ -126,6 +147,36 @@ class AnnotationFileMoverApp:
             self.message_text.config(state="disabled")
 
         self.root.after(0, clear)
+
+    def run_easycapture(self):
+        source_text = self.source_var.get()
+        try:
+            source = int(source_text)
+        except ValueError:
+            source = source_text  # 文字列ならそのまま（ファイル名やURL）
+
+        # EasyCaptureが起動中なら終了する
+        if self.easy_capture is not None:
+            try:
+                self.easy_capture.finish()
+                self.log_message("既存のEasyCaptureを終了しました。")
+            except Exception as e:
+                self.log_message(f"EasyCapture終了時にエラー: {e}")
+            self.easy_capture = None
+
+        try:
+            self.easy_capture = EasyCapture(
+                source=source,
+                width=CAPTURE_WIDTH,
+                height=CAPTURE_HEIGHT,
+                interval=CAPTURE_INTERVAL,
+                save_directory=self.selected_folder,
+            )
+            self.log_message(f"EasyCaptureを起動しました: source={source}")
+            self.easy_capture.open_display()
+        except Exception as e:
+            self.log_message(f"EasyCapture初期化エラー: {e}")
+            return
 
     def select_folder(self):
         folder = filedialog.askdirectory(title="メインフォルダを選択してください")
@@ -167,6 +218,7 @@ class AnnotationFileMoverApp:
             self.log_message("エラー：以下の項目を確認してください。")
             for msg in error_messages:
                 self.log_message(" - " + msg)
+            self.btn_capture.configure(state="disabled")
             self.btn_pre_move.configure(state="disabled")
             self.btn_post_move.configure(state="disabled")
             self.btn_change_label_id.configure(state="disabled")
@@ -177,6 +229,7 @@ class AnnotationFileMoverApp:
             return
         else:
             self.log_message("すべてのフォルダ・ファイル構造を確認しました。OKです。")
+            self.btn_capture.configure(state="normal")
             self.btn_pre_move.configure(state="normal")
             self.btn_post_move.configure(state="normal")
             self.btn_change_label_id.configure(state="normal")
