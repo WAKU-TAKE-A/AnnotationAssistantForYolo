@@ -103,7 +103,44 @@ before,after
 - 予測処理は大量の画像で時間がかかる場合があります。UIは非同期処理しますがPCの性能に依存します。  
 - 追加学習は `train.py` の内容に依存します。スクリプトが正常に動くことを事前に確認してください。  
 - このツールではファイルの移動・コピーを行います。重要なデータはバックアップを推奨します。
+- labelImg（1.8.6）とPyQt5（5.15.11）がインストールされた時、以下のファイルを修正する必要があります。
+
+「/Lib/site-packages/labelImg/labelImg.py」
+
+```
+965行目：
+        bar.setValue(bar.value() + bar.singleStep() * units)
+        ↓
+        bar.setValue(int(bar.value() + bar.singleStep() * units))
+        
+1025行目：
+        h_bar.setValue(new_h_bar_value)
+        v_bar.setValue(new_v_bar_value)
+        ↓
+        h_bar.setValue(int(new_h_bar_value))
+        v_bar.setValue(int(new_v_bar_value))
+```
+
+「/Lib/site-packages/libs/canvas.py」
+
+```
+526行目：
+            p.drawRect(left_top.x(), left_top.y(), rect_width, rect_height)
+
+        if self.drawing() and not self.prev_point.isNull() and not self.out_of_pixmap(self.prev_point):
+            p.setPen(QColor(0, 0, 0))
+            p.drawLine(self.prev_point.x(), 0, self.prev_point.x(), self.pixmap.height())
+            p.drawLine(0, self.prev_point.y(), self.pixmap.width(), self.prev_point.y())
+        ↓
+                    p.drawRect(int(left_top.x()), int(left_top.y()), int(rect_width), int(rect_height))
+
+        if self.drawing() and not self.prev_point.isNull() and not self.out_of_pixmap(self.prev_point):
+            p.setPen(QColor(0, 0, 0))
+            p.drawLine(int(self.prev_point.x()), 0, int(self.prev_point.x()), int(self.pixmap.height()))
+            p.drawLine(0, int(self.prev_point.y()), int(self.pixmap.width()), int(self.prev_point.y()))
+```
 - AnnotationAssistantForYolo.pyの内容を生成AIに貼り付けて、「改造できる？」と聞いて、後はご自由に改変してください。
+
 
 ---
 
